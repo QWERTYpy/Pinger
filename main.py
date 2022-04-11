@@ -7,6 +7,11 @@ from colorama import init
 from colorama import Fore, Back, Style
 from ping3 import ping, verbose_ping
 from tqdm import tqdm
+import win10toast
+from time import sleep
+import os
+
+clear = lambda: os.system('cls')
 from tkinter import messagebox
 
 ip_book = openpyxl.load_workbook("ip cam.xlsx")  # Открывает файл
@@ -30,34 +35,42 @@ max_col = worksheet.max_column  # Получаем максимальное ко
 init()
 table_ip = PrettyTable()
 table_ip.field_names = ['IP Адрес', 'Статус', 'Комментарий']
-scan_ip=[]
-off_ip=[]
-count_device = 0
+scan_ip = []
+off_ip = []
+
 for row in range(1, max_row):  # Запускаем цикл по всем строкам
     val = worksheet.cell(row=row, column=5).value
     if val == 'Камера':  # Если устройство камера
-
-        count_device+=1
         ip_cam = worksheet.cell(row=row, column=1).value
         comment = worksheet.cell(row=row, column=6).value
+        scan_ip.append([ip_cam, row, comment])
+
+count_device = len(scan_ip)
+def tab_ping():
+    for status in tqdm(range(count_device)):
+        ip_cam, row, comment = scan_ip[status]
         ip_pin = ping(ip_cam)
         if ip_pin is None:
             ip_pin = ping(ip_cam)
             if ip_pin is None:
                 off_ip.append([ip_cam, row, comment])
                 table_ip.add_row([Fore.RED+ip_cam+Style.RESET_ALL, ip_pin, comment])
-print('Всего устройств : ' + str(count_device) + Fore.GREEN + '  На связи : ' + str(count_device-len(off_ip)) +
-      Fore.RED + '  Отсутсвуют : ' + str(len(off_ip)) + Style.RESET_ALL)
-print(table_ip)
+    print('Всего устройств : ' + str(count_device) + Fore.GREEN + '  На связи : ' + str(count_device-len(off_ip)) +
+          Fore.RED + '  Отсутсвуют : ' + str(len(off_ip)) + Style.RESET_ALL)
+    print(table_ip)
 
-import win10toast
-toaster = win10toast.ToastNotifier()
-error_text = ''
-for ip, _, com in off_ip:
-    error_text +=f'{ip} - {com}\n'
-toaster.show_toast("Отсутсвуют", error_text, duration=100)
-#messagebox.showwarning('Отсутствуют', off_ip)
-# print('Проверка недоступных устройств')
-# for ip, row in off_ip:
-#     print(Fore.RED+ip+Style.RESET_ALL)
-#     verbose_ping(ip)
+
+    toaster = win10toast.ToastNotifier()
+    error_text = ''
+    for ip, _, com in off_ip:
+        error_text +=f'{ip} - {com}\n'
+    toaster.show_toast("Отсутсвуют", error_text, duration=5)
+
+    print('До обновления (сек) :')
+    for i in range(10, 0, -1):
+        print(i, end = '')
+        sleep(1)
+        print('', end='\r')
+while True:
+    tab_ping()
+    clear()
