@@ -32,43 +32,75 @@ max_col = worksheet.max_column  # Получаем максимальное ко
 #     if val == 'Камера':
 #         print(worksheet.cell(row=row, column=1).value)
 scan_ip = []
+off_ip = []
 init()
 table_ip = PrettyTable()
-table_ip.field_names = ['IP Адрес', 'Статус', 'Комментарий']
+table_ip.field_names = ['IP Адрес', 'Статус', 'Объект', 'Комментарий']
 
 
 for row in range(1, max_row):  # Запускаем цикл по всем строкам
     val = worksheet.cell(row=row, column=5).value
     if val == 'Камера':  # Если устройство камера
         ip_cam = worksheet.cell(row=row, column=1).value
-        comment = worksheet.cell(row=row, column=6).value
-        scan_ip.append([ip_cam, row, comment])
+        ip_object = worksheet.cell(row=row, column=2).value
+        ip_comment = worksheet.cell(row=row, column=6).value
+        scan_ip.append([row, ip_cam, ip_object, ip_comment])
 
 
+def modification_off_ip(flag_ip, row, ip_cam, ip_object, ip_comment):
+    flag_add = True
+    for i in range(len(off_ip)):
+        if ip_cam == off_ip[i][2]:
+            if not flag_ip:
+                off_ip[i][0] = 1
+                flag_add = False
+            else:
+                off_ip[i][0] = 2
+
+    if flag_add and not flag_ip:
+        off_ip.append([0, row, ip_cam, ip_object, ip_comment])
 
 
 def tab_ping():
-
-    off_ip = []
     count_device = len(scan_ip)
     for status in tqdm(range(count_device)):
-        ip_cam, row, comment = scan_ip[status]
+        row, ip_cam, ip_object , ip_comment = scan_ip[status]
         ip_pin = ping(ip_cam)
-        if ip_pin is None:
-            ip_pin = ping(ip_cam)
-            if ip_pin is None:
-                off_ip.append([ip_cam, row, comment])
-                table_ip.add_row([Fore.RED+ip_cam+Style.RESET_ALL, ip_pin, comment])
+        flag_ip = True
+        if ip_pin is None or type(ip_pin) is not float:
+            flag_ip = False
+            # ip_pin = ping(ip_cam)
+            # if ip_pin is None or type(ip_pin) is not float:
+            #     flag_ip = False
+
+        modification_off_ip(flag_ip, row, ip_cam, ip_object, ip_comment)
+        if not flag_ip:
+            table_ip.add_row([Fore.RED+ip_cam+Style.RESET_ALL, ip_pin, ip_object, ip_comment])
     print('Всего устройств : ' + str(count_device) + Fore.GREEN + '  На связи : ' + str(count_device-len(off_ip)) +
           Fore.RED + '  Отсутсвуют : ' + str(len(off_ip)) + Style.RESET_ALL)
-    print(table_ip)
+    if len(off_ip)>0:
+        print(table_ip)
     table_ip.clear_rows()
-
+    print(off_ip)
     toaster = win10toast.ToastNotifier()
-    error_text = ''
-    for ip, _, com in off_ip:
-        error_text +=f'{ip} - {com}\n'
-    toaster.show_toast("Отсутсвуют", error_text, duration=5)
+    off_text = ''
+    on_text = ''
+    del_index = []
+    for flag, _, ip, obj, com in off_ip:
+        if not flag:
+            off_text += f'{ip[10:]},'
+        if flag == 2:
+            on_text += f'{ip[10:]},'
+            del_index.append(off_ip.index([flag, _, ip, obj, com]))
+            # off_ip.pop(off_ip.index([flag, _, ip, obj, com]))
+    del_index.reverse()
+    for _ in del_index:
+        off_ip.pop(_)
+    print(off_ip)
+    if len(off_text)>0:
+        toaster.show_toast("Отсутсвуют", off_text, icon_path='ping.ico', duration=5, threaded=True)
+    if len(on_text)>0:
+        toaster.show_toast("Восстановление связи", on_text, icon_path='ping.ico', duration=5, threaded=True)
 # Надо запустить отдельным потоком
     print('До обновления (сек) :')
     for i in range(10, 0, -1):
