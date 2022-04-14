@@ -50,7 +50,8 @@ def excel_to_list():
             ip_comment = worksheet.cell(row=row, column=6).value
             ip_priority = worksheet.cell(row=row, column=7).value
             ip_active = worksheet.cell(row=row, column=8).value
-            scan_ip.append([row, ip_cam, ip_object, ip_type, ip_comment, ip_priority, ip_active])
+            if ip_priority != 'False':
+                scan_ip.append([row, ip_cam, ip_object, ip_type, ip_comment, ip_priority, ip_active])
 
 
 def modification_off_ip(flag_ip, row, ip_cam, ip_object, ip_type, ip_comment):
