@@ -12,13 +12,14 @@ import msvcrt
 from rich.console import Console
 from rich.table import Table
 from rich.progress import track
+import datetime
 
 
 ip_book = openpyxl.load_workbook("ip cam.xlsx")  # Открывает файл
 worksheet = ip_book.active  # Делаем его активным
 max_row = worksheet.max_row  # Получаем максимальное количество строк
 max_col = worksheet.max_column  # Получаем максимальное количество столбцов
-
+#file_log = open('log.txt', 'w')
 # Инициализация начальных данных
 sec = 600  # По умолчанию перезагрузка через 600 сек
 first_start = True  # Флаг первичной загрузки данных
@@ -43,6 +44,7 @@ def table_ip_generation():
     table_ip.add_column('Объект')
     table_ip.add_column('Тип')
     table_ip.add_column('Комментарий')
+    table_ip.add_column('Время OFF-LINE')
     return table_ip
 
 def table_error_generation():
@@ -86,6 +88,7 @@ def modification_off_ip(flag_ip, row, ip_cam, ip_object, ip_type, ip_comment):
     :return: None
     """
     flag_add = True  # По умолчанию новую запись помечаем на добавление
+    time_end = 0
     for i in range(len(off_ip)):
         if ip_cam == off_ip[i][2]:  # Если устройство присутствует в списке
             if not flag_ip:  # Если оно снова не ответило на пинг отключаем уведомление
@@ -93,9 +96,12 @@ def modification_off_ip(flag_ip, row, ip_cam, ip_object, ip_type, ip_comment):
             else:
                 off_ip[i][0] = 2  # Если ответило на пинг, помечаем на удаление из списка
             flag_add = False
+        time_end = off_ip[i][6]
 
     if flag_add and not flag_ip:  # Если устройства нет в списке добавляем
-        off_ip.append([0, row, ip_cam, ip_object, ip_type, ip_comment])
+        time_end = int(time.time())
+        off_ip.append([0, row, ip_cam, ip_object, ip_type, ip_comment, time_end])
+    return time_end
 
 
 def print_time_input(timeout):
@@ -151,14 +157,16 @@ def tab_ping():
             if ip_pin is None or type(ip_pin) is not float:
                 flag_ip = False
 
-            modification_off_ip(flag_ip, row, ip_cam, ip_object, ip_type, ip_comment)
+            time_end = modification_off_ip(flag_ip, row, ip_cam, ip_object, ip_type, ip_comment)
             if ip_priority == 'True':
                 if flag_ip:
                     table_priority.add_row(f'[green]{ip_cam}[/green]', str(flag_ip), ip_object, ip_type, ip_comment)
                 else:
                     table_priority.add_row(f'[red]{ip_cam}[/red]', str(flag_ip), ip_object, ip_type, ip_comment)
             if not flag_ip:
-                table_ip.add_row(f'[red]{ip_cam}[/red]', str(ip_pin), ip_object, ip_type, ip_comment)
+
+                time_format = str(datetime.timedelta(seconds=int(time.time())-time_end))
+                table_ip.add_row(f'[red]{ip_cam}[/red]', str(ip_pin), ip_object, ip_type, ip_comment, time_format)
         if ip_active == 'OFF':
             count_error += 1
             table_error.add_row(f'[red]{ip_cam}[/red]', ip_object, ip_type, ip_comment)
@@ -174,14 +182,17 @@ def tab_ping():
     off_text = ''
     on_text = ''
     del_index = []
-
-    for flag, _, ip, obj, tipe, com in off_ip:
+    file_log = open('log.txt', 'a')
+    for flag, _, ip, obj, _type, com, tm in off_ip:
         if not flag:
             off_text += f'{ip[10:]},'
+            file_log.write(f'OFF >> {ip} - {time.ctime()}\n')
         if flag == 2:
             on_text += f'{ip[10:]},'
-            del_index.append(off_ip.index([flag, _, ip, obj, tipe, com]))
+            file_log.write(f'ONN >> {ip} - {time.ctime()}\n')
+            del_index.append(off_ip.index([flag, _, ip, obj, _type, com, tm]))
             # off_ip.pop(off_ip.index([flag, _, ip, obj, com]))
+    file_log.close()
     del_index.reverse()
     for _ in del_index:
         off_ip.pop(_)
