@@ -4,15 +4,14 @@
 import sys
 
 import openpyxl  # Библиотека для работы с таблицами
-from prettytable import PrettyTable
-from colorama import init
-from colorama import Fore, Style
 from ping3 import ping
-from tqdm import tqdm  # Библиотека для рисования шкалы выполнения
 import win10toast  # Библиотека для всплывающих сообщений
 import time
 import os
 import msvcrt
+from rich.console import Console
+from rich.table import Table
+from rich.progress import track
 
 
 ip_book = openpyxl.load_workbook("ip cam.xlsx")  # Открывает файл
@@ -25,14 +24,34 @@ sec = 600  # По умолчанию перезагрузка через 600 с�
 first_start = True  # Флаг первичной загрузки данных
 scan_ip = []  # Список всех устройств
 off_ip = []  # Список отсутствующих
-init()  # Проводим инициализацию для цветного оформления
-table_ip = PrettyTable()  # Таблица с устройствами off-line
-table_priority = PrettyTable()  # Таблица с приоритетными устройствами
-table_error = PrettyTable()  # Таблица с отключенными устройствами
-table_ip.field_names = ['IP Адрес', 'Статус', 'Объект', 'Тип', 'Комментарий']
-table_priority.field_names = ['IP Адрес', 'Статус', 'Объект', 'Тип', 'Комментарий']
-table_error.field_names = ['IP Адрес', 'Объект', 'Тип', 'Комментарий']
 
+console = Console()
+
+def table_priority_generation():
+    table_priority = Table(title="Приоритетные устройства")
+    table_priority.add_column('IP Адрес')
+    table_priority.add_column('Статус')
+    table_priority.add_column('Объект')
+    table_priority.add_column('Тип')
+    table_priority.add_column('Комментарий')
+    return table_priority
+
+def table_ip_generation():
+    table_ip = Table(title="Устройства не в сети")
+    table_ip.add_column('IP Адрес')
+    table_ip.add_column('Статус')
+    table_ip.add_column('Объект')
+    table_ip.add_column('Тип')
+    table_ip.add_column('Комментарий')
+    return table_ip
+
+def table_error_generation():
+    table_error = Table(title="Неисправные устройства")
+    table_error.add_column('IP Адрес')
+    table_error.add_column('Объект')
+    table_error.add_column('Тип')
+    table_error.add_column('Комментарий')
+    return table_error
 
 def excel_to_list():
     """
@@ -118,7 +137,13 @@ def tab_ping():
     count_error = 0
     global first_start
     first_start = False
-    for status in tqdm(range(count_device), desc='PING'):
+
+    table_priority = table_priority_generation()
+    table_ip = table_ip_generation()
+    table_error = table_error_generation()
+
+
+    for status in track(range(count_device),description='[green]Ping'):
         row, ip_cam, ip_object, ip_type, ip_comment, ip_priority, ip_active = scan_ip[status]
         if ip_active == 'ON':
             ip_pin = ping(ip_cam)
@@ -129,30 +154,22 @@ def tab_ping():
             modification_off_ip(flag_ip, row, ip_cam, ip_object, ip_type, ip_comment)
             if ip_priority == 'True':
                 if flag_ip:
-                    table_priority.add_row([Fore.GREEN+ip_cam+Style.RESET_ALL,
-                                            flag_ip, ip_object, ip_type, ip_comment])
+                    table_priority.add_row(f'[green]{ip_cam}[/green]', str(flag_ip), ip_object, ip_type, ip_comment)
                 else:
-                    table_priority.add_row([Fore.RED + ip_cam + Style.RESET_ALL,
-                                            flag_ip, ip_object, ip_type, ip_comment])
+                    table_priority.add_row(f'[red]{ip_cam}[/red]', str(flag_ip), ip_object, ip_type, ip_comment)
             if not flag_ip:
-                table_ip.add_row([Fore.RED+ip_cam+Style.RESET_ALL, ip_pin, ip_object, ip_type, ip_comment])
+                table_ip.add_row(f'[red]{ip_cam}[/red]', str(ip_pin), ip_object, ip_type, ip_comment)
         if ip_active == 'OFF':
             count_error += 1
-            table_error.add_row([Fore.RED+ip_cam+Style.RESET_ALL, ip_object, ip_type, ip_comment])
-    print('Приоритетные устройства')
-    print(table_priority)
-    print('Неисправные устройства')
-    print(table_error)
-    print('Всего устройств : ' + str(count_device) + Fore.GREEN + '  На связи : ' +
-          str(count_device-len(off_ip)-count_error) +
-          Fore.RED + '  Отсутствуют : ' + str(len(off_ip)) + Fore.BLUE +
-          ' Отключены : ' + str(count_error) + Style.RESET_ALL)
+            table_error.add_row(f'[red]{ip_cam}[/red]', ip_object, ip_type, ip_comment)
+    console.print(table_priority)
+    console.print(table_error)
+    console.print(f'Всего устройств: {str(count_device)} '
+                  f'[green] На связи: {str(count_device-len(off_ip)-count_error)}[/green]'
+                  f'[red] Отсутствуют: {str(len(off_ip))}[/red]'
+                  f'[blue] Отключены: {str(count_error)}[/blue]')
     if len(off_ip) > 0:
-        print('Устройства не в сети')
-        print(table_ip)
-    table_ip.clear_rows()
-    table_priority.clear_rows()
-    table_error.clear_rows()
+        console.print(table_ip)
     toaster = win10toast.ToastNotifier()
     off_text = ''
     on_text = ''
