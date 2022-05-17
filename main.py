@@ -13,6 +13,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.progress import track
 import datetime
+from collections import deque
 
 
 ip_book = openpyxl.load_workbook("ip cam.xlsx")  # Открывает файл
@@ -170,14 +171,20 @@ def tab_ping():
         if ip_active == 'OFF':
             count_error += 1
             table_error.add_row(f'[red]{ip_cam}[/red]', ip_object, ip_type, ip_comment)
-    console.print(table_priority)
-    console.print(table_error)
-    console.print(f'Всего устройств: {str(count_device)} '
+
+    grid_main = Table.grid(expand=True)
+    grid_main.add_column()
+    grid_main.add_column(justify="left")
+    grid_left = Table.grid(expand=True)
+    grid_left.add_column()
+    grid_left.add_row(table_priority)
+    grid_left.add_row(table_error)
+    grid_left.add_row(f'Всего устройств: {str(count_device)} '
                   f'[green] На связи: {str(count_device-len(off_ip)-count_error)}[/green]'
                   f'[red] Отсутствуют: {str(len(off_ip))}[/red]'
                   f'[blue] Отключены: {str(count_error)}[/blue]')
     if len(off_ip) > 0:
-        console.print(table_ip)
+        grid_left.add_row(table_ip)
     toaster = win10toast.ToastNotifier()
     off_text = ''
     on_text = ''
@@ -193,6 +200,24 @@ def tab_ping():
             del_index.append(off_ip.index([flag, _, ip, obj, _type, com, tm]))
             # off_ip.pop(off_ip.index([flag, _, ip, obj, com]))
     file_log.close()
+    table_log = Table(title="История опросов")
+    table_log.add_column('IP Адрес - Время')
+    file_log = open('log.txt','r')
+    my_stack = deque(maxlen=10)
+    for line_log in file_log:
+        my_stack.append(line_log)
+    file_log.close()
+    for stack_line in my_stack:
+        #sss= stack_line[0:3]
+        if stack_line[0:3] == 'ONN':
+            table_log.add_row(f'[green]{stack_line}[/green]')
+        if stack_line[0:3] == 'OFF':
+            table_log.add_row(f'[red]{stack_line}[/red]')
+
+    grid_main.add_row(grid_left,table_log)
+    console.print(grid_main)
+
+
     del_index.reverse()
     for _ in del_index:
         off_ip.pop(_)
