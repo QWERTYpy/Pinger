@@ -14,15 +14,15 @@ from rich.table import Table
 from rich.progress import track
 import datetime
 from collections import deque
+from init_const import dict_const
 
 
-ip_book = openpyxl.load_workbook("ip cam.xlsx")  # Открывает файл
+ip_book = openpyxl.load_workbook(dict_const['name_file'])  # Открывает файл
 worksheet = ip_book.active  # Делаем его активным
 max_row = worksheet.max_row  # Получаем максимальное количество строк
 max_col = worksheet.max_column  # Получаем максимальное количество столбцов
-#file_log = open('log.txt', 'w')
+
 # Инициализация начальных данных
-sec = 600  # По умолчанию перезагрузка через 600 сек
 scan_ip = []  # Список всех устройств
 off_ip = []  # Список отсутствующих
 
@@ -30,11 +30,15 @@ console = Console()
 
 def table_generation(title_table, columns_table, type = 'Main'):
     if type == 'Main':
-        table = Table(title=title_table)
+        table = Table(title=f'{title_table}')
     elif type == 'Grid':
         table = Table.grid(expand=True)
     for column in columns_table:
-        table.add_column(column)
+        if isinstance(column, str):
+            table.add_column(column)
+        if isinstance(column, list):
+            table.add_column(column[0], width=column[1])
+
     return  table
 
 
@@ -46,16 +50,14 @@ def excel_to_list():
     """
     scan_ip = []
     for row in range(1, max_row):  # Запускаем цикл по всем строкам
-        val = worksheet.cell(row=row, column=5).value
-        if val == 'Камера' or val == 'Хранилище' or val == 'ПК' \
-                or val == 'Видеорегистратор' or val == 'Wi-Fi' or val == 'Преобразователь':  # Если устройство камера
-            ip_cam = worksheet.cell(row=row, column=1).value  # Адрес устройства
-            ip_object = worksheet.cell(row=row, column=2).value  # Объект на котором оно установлена
-            ip_type = worksheet.cell(row=row, column=5).value  # Тип устройства
-            ip_comment = worksheet.cell(row=row, column=6).value  # Комментарий
-            ip_priority = worksheet.cell(row=row, column=7).value  # Важность для отображения
-            ip_active = worksheet.cell(row=row, column=8).value  # Работоспособность устройства
-            if ip_priority != 'False':  # Если устройство не исключено из наблюдения
+        ip_type = worksheet.cell(row=row, column=dict_const['ip_type']).value  # Тип устройства
+        if ip_type in dict_const['type_name']:  # Если устройство есть в списке
+            ip_cam = worksheet.cell(row=row, column=dict_const['ip_camera']).value  # Адрес устройства
+            ip_object = worksheet.cell(row=row, column=dict_const['ip_object']).value  # Объект на котором оно установлена
+            ip_comment = worksheet.cell(row=row, column=dict_const['ip_comment']).value  # Комментарий
+            ip_priority = worksheet.cell(row=row, column=dict_const['ip_priority']).value  # Важность для отображения
+            ip_active = worksheet.cell(row=row, column=dict_const['ip_active']).value  # Работоспособность устройства
+            if ip_priority != dict_const['not_important']:  # Если устройство не исключено из наблюдения
                 scan_ip.append([row, ip_cam, ip_object, ip_type, ip_comment, ip_priority, ip_active])
     return scan_ip
 
@@ -96,7 +98,7 @@ def print_time_input(timeout):
 
     :return:
     """
-    global sec
+    #global sec
     start = time.monotonic()
     now = time.monotonic()
     count_sec = 0
@@ -112,7 +114,7 @@ def print_time_input(timeout):
             if c == 'u':
                 break
             if c == 't':
-                sec = int(input('Введите количество секунд :'))
+                dict_const['time_sec'] = int(input('Введите количество секунд :'))
                 break
 
         now = time.monotonic()
@@ -124,16 +126,11 @@ def tab_ping(scan_ip):
     :return:
     """
     count_device = len(scan_ip)
-    count_error = 0
     #  Создаем необходимые таблицы для визуального оформления
-    columns_table = ('IP Адрес', 'Статус', 'Объект', 'Тип', 'Комментарий')
-    table_priority = table_generation("Приоритетные устройства", columns_table)
-    columns_table = ('IP Адрес', 'Статус', 'Объект', 'Тип', 'Комментарий', 'Время OFF-LINE')
-    table_ip = table_generation("Устройства не в сети", columns_table)
-    columns_table = ('IP Адрес', 'Объект', 'Тип', 'Комментарий')
-    table_error = table_generation("Неисправные устройства", columns_table)
-    columns_table = ("", 'justify="left"')
-    grid_main = table_generation("", columns_table, 'Grid')
+    table_priority = table_generation(dict_const['table_priority_name'], dict_const['table_priority_field'])
+    table_ip = table_generation(dict_const['table_ip_name'], dict_const['table_ip_field'])
+    table_error = table_generation(dict_const['table_error_name'], dict_const['table_error_field'])
+    grid_main = table_generation("", dict_const['console'][2:4], 'Grid')
     grid_left = table_generation("", ("",), 'Grid')
     grid_left.add_row(table_priority)
     grid_left.add_row(table_error)
@@ -172,7 +169,7 @@ def tab_ping(scan_ip):
     off_text = ''
     on_text = ''
     del_index = []
-    file_log = open('log.txt', 'a')
+    file_log = open(dict_const['log_file'], 'a')
     for flag, _, ip, obj, _type, com, tm in off_ip:
         if not flag:  # Если устройство впервые не ответило, выводим сообщение и пишем в лог
             off_text += f'{ip[10:]},'
@@ -193,10 +190,10 @@ def tab_ping(scan_ip):
     if len(on_text) > 0:
         toaster.show_toast("Восстановление связи", on_text[:-1], icon_path='ping.ico', duration=5, threaded=True)
     # Заполняем таблицу событий
-    file_log = open('log.txt', 'r')
-    my_stack = deque(maxlen=15)  # Выводим последние 15
+    file_log = open(dict_const['log_file'], 'r')
+    my_stack = deque(maxlen=dict_const['buffer'])  # Выводим согласно размера буфера
     for line_log in file_log:
-        my_stack.append(line_log)
+        my_stack.append(line_log[:-1])
     file_log.close()
     for stack_line in my_stack:
         if stack_line[0:3] == 'ONN':
@@ -204,6 +201,7 @@ def tab_ping(scan_ip):
         if stack_line[0:3] == 'OFF':
             table_log.add_row(f'[red]{stack_line}[/red]')
     # Выводим таблицы на экран
+    os.system(f"mode con:cols={dict_const['console'][0]} lines={dict_const['console'][1]}")
     console.print(grid_main)
 
 
@@ -211,5 +209,5 @@ while True:
     if len(scan_ip) == 0:
         scan_ip = excel_to_list()
     tab_ping(scan_ip)
-    print_time_input(sec)
+    print_time_input(dict_const['time_sec'])
     os.system('cls')
