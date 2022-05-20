@@ -2,7 +2,7 @@
 Скрипт для опроса сетевых устройств
 """
 import sys
-
+import threading
 import openpyxl  # Библиотека для работы с таблицами
 from ping3 import ping
 import win10toast  # Библиотека для всплывающих сообщений
@@ -25,13 +25,22 @@ max_col = worksheet.max_column  # Получаем максимальное ко
 # Инициализация начальных данных
 scan_ip = []  # Список всех устройств
 off_ip = []  # Список отсутствующих
-
+reboot_ping = False
 console = Console()
 
-def table_generation(title_table, columns_table, type = 'Main'):
-    if type == 'Main':
+
+def table_generation(title_table, columns_table, _type='Main'):
+    """ Функция создает таблицы для форматирования вывода консоли
+
+    :param title_table: Заголовок таблицы
+    :param columns_table: Список заголовков столбцов
+    :param _type: Видимая таблица или для зонирования
+    :return:
+    Указатель на созданную таблицу
+    """
+    if _type == 'Main':
         table = Table(title=f'{title_table}')
-    elif type == 'Grid':
+    elif _type == 'Grid':
         table = Table.grid(expand=True)
     for column in columns_table:
         if isinstance(column, str):
@@ -39,7 +48,7 @@ def table_generation(title_table, columns_table, type = 'Main'):
         if isinstance(column, list):
             table.add_column(column[0], width=column[1])
 
-    return  table
+    return table
 
 
 def excel_to_list():
@@ -47,6 +56,7 @@ def excel_to_list():
     Функция заполняет список устройствами для опроса
 
     :return:
+    Список списков устройств
     """
     scan_ip = []
     for row in range(1, max_row):  # Запускаем цикл по всем строкам
@@ -61,6 +71,7 @@ def excel_to_list():
                 scan_ip.append([row, ip_cam, ip_object, ip_type, ip_comment, ip_priority, ip_active])
     return scan_ip
 
+
 def modification_off_ip(flag_ip, row, ip_cam, ip_object, ip_type, ip_comment):
     """
     Данная функция изменяет список с отсутствующими камерами, добавляя новые или помечая на удаление старые
@@ -71,7 +82,7 @@ def modification_off_ip(flag_ip, row, ip_cam, ip_object, ip_type, ip_comment):
     :param ip_object: Объект на котором установлено устройство
     :param ip_type: Тип устройства
     :param ip_comment: Комментарий
-    :return: None
+    :return: Время остановки устройства
     """
     flag_add = True  # По умолчанию новую запись помечаем на добавление
     time_end = 0
@@ -92,13 +103,12 @@ def modification_off_ip(flag_ip, row, ip_cam, ip_object, ip_type, ip_comment):
 
 def print_time_input(timeout):
     """
-    Данная функция выводит обратный таймер и следит за вводом для управления программой
+    Данная процедура выводит обратный таймер и следит за вводом для управления программой
 
     :param timeout: Значение таймера
 
     :return:
     """
-    #global sec
     start = time.monotonic()
     now = time.monotonic()
     count_sec = 0
@@ -116,13 +126,14 @@ def print_time_input(timeout):
             if c == 't':
                 dict_const['time_sec'] = int(input('Введите количество секунд :'))
                 break
-
+        if reboot_ping:
+            break
         now = time.monotonic()
 
 
 def tab_ping(scan_ip):
     """
-
+    Процедура отвечающая за отрисовку консоли согласно полученных данных
     :return:
     """
     count_device = len(scan_ip)
@@ -160,9 +171,9 @@ def tab_ping(scan_ip):
             table_error.add_row(f'[red]{ip_cam}[/red]', ip_object, ip_type, ip_comment)
     #  Заполняем строки таблицами
     grid_left.add_row(f'Всего устройств: {str(count_device)} '
-                  f'[green] На связи: {count_device-table_ip.row_count-table_error.row_count}[/green]'
-                  f'[red] Отсутствуют: {table_ip.row_count}[/red]'
-                  f'[blue] Отключены: {table_error.row_count}[/blue]')
+                      f'[green] На связи: {count_device-table_ip.row_count-table_error.row_count}[/green]'
+                      f'[red] Отсутствуют: {table_ip.row_count}[/red]'
+                      f'[blue] Отключены: {table_error.row_count}[/blue]')
     if table_ip.row_count > 0:  # Если таблица не пустая - выводим
         grid_left.add_row(table_ip)
 
@@ -205,9 +216,29 @@ def tab_ping(scan_ip):
     console.print(grid_main)
 
 
+def hidden_ping():
+    """
+    Процедура которая пингует отсутсвующие устройства через 5 сек, для подтвержения отсуствия связи
+    :return:
+    """
+    time.sleep(5)
+    global reboot_ping
+    for flag, _, ip, obj, _type, com, tm in off_ip:
+        ip_pin = ping(ip)
+        flag_ip = True  # Пинг прошёл
+        if ip_pin is None or type(ip_pin) is not float:
+            flag_ip = False
+        if flag_ip:
+            reboot_ping = True
+            break
+
+
 while True:
     if len(scan_ip) == 0:
         scan_ip = excel_to_list()
     tab_ping(scan_ip)
+    reboot_ping = False
+    if len(off_ip) > 0:
+        threading.Thread(target=hidden_ping).start()
     print_time_input(dict_const['time_sec'])
     os.system('cls')
