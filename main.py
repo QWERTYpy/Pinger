@@ -119,11 +119,11 @@ def print_time_input(timeout):
             print("\rОсталось %03d c. | u-обновить | t-таймер | q-выход :" % print_time, end='')
         if msvcrt.kbhit():
             c = msvcrt.getwch()
-            if c == 'q':
+            if c == 'q' or c == 'й':
                 sys.exit()
-            if c == 'u':
+            if c == 'u' or c == 'г':
                 break
-            if c == 't':
+            if c == 't' or c == 'е':
                 dict_const['time_sec'] = int(input('Введите количество секунд :'))
                 break
         if reboot_ping:
