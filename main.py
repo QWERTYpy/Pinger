@@ -59,7 +59,7 @@ def excel_to_list():
     Список списков устройств
     """
     scan_ip = []
-    for row in range(1, max_row):  # Запускаем цикл по всем строкам
+    for row in range(1, max_row+1):  # Запускаем цикл по всем строкам
         ip_type = worksheet.cell(row=row, column=dict_const['ip_type']).value  # Тип устройства
         if ip_type in dict_const['type_name']:  # Если устройство есть в списке
             ip_cam = worksheet.cell(row=row, column=dict_const['ip_camera']).value  # Адрес устройства
@@ -159,7 +159,7 @@ def tab_ping(scan_ip):
                 flag_ip = False  # Пинг не прошёл
             # Изменяем список устройств не отвечающих на пинг
             time_end = modification_off_ip(flag_ip, row, ip_cam, ip_object, ip_type, ip_comment)
-            if ip_priority == 'True':  # Заполняем таблицу приоритетных устройств
+            if ip_priority == dict_const['important']:  # Заполняем таблицу приоритетных устройств
                 if flag_ip:
                     table_priority.add_row(f'[green]{ip_cam}[/green]', str(flag_ip), ip_object, ip_type, ip_comment)
                 else:
