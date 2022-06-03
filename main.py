@@ -15,6 +15,7 @@ from rich.progress import track
 import datetime
 from collections import deque
 from init_const import dict_const
+import threading
 
 
 ip_book = openpyxl.load_workbook(dict_const['name_file'])  # Открывает файл
@@ -68,7 +69,7 @@ def excel_to_list():
             ip_priority = worksheet.cell(row=row, column=dict_const['ip_priority']).value  # Важность для отображения
             ip_active = worksheet.cell(row=row, column=dict_const['ip_active']).value  # Работоспособность устройства
             if ip_priority != dict_const['not_important']:  # Если устройство не исключено из наблюдения
-                scan_ip.append([row, ip_cam, ip_object, ip_type, ip_comment, ip_priority, ip_active])
+                scan_ip.append([0, row, ip_cam, ip_object, ip_type, ip_comment, ip_priority, ip_active])
     return scan_ip
 
 
@@ -130,6 +131,15 @@ def print_time_input(timeout):
             break
         now = time.monotonic()
 
+def thread_ping(ind,list_ip):
+    ip_pin = ping(list_ip[2])
+    list_ip[0] = 1  # Пинг прошёл
+    if ip_pin is None or type(ip_pin) is not float:
+        ip_pin = ping(list_ip[2])
+        if ip_pin is None or type(ip_pin) is not float:
+            list_ip[0] = 0  # Пинг не прошёл
+    thread_flag[ind] = 1
+
 
 def tab_ping(scan_ip):
     """
@@ -150,23 +160,34 @@ def tab_ping(scan_ip):
     table_log.add_column('IP Адрес - Время')
     grid_main.add_row(grid_left, table_log)
 
-    for row, ip_cam, ip_object, ip_type, ip_comment, ip_priority, ip_active in \
-            track(scan_ip, description='[green]Ping'):  # Рисуем трак бар и пробегаем все устройства
+    for ind, list_ip in track(enumerate(scan_ip), description='[green]Ping'):
+        if list_ip[7] == 'ON':
+            threading.Thread(target=thread_ping, args=(ind, list_ip)).start()
+        else:
+            thread_flag[ind] = 1
+
+    while True:
+        #time.sleep(1)
+        # print(thread_flag)
+        if all(thread_flag):
+            break
+
+    for flag_ip, row, ip_cam, ip_object, ip_type, ip_comment, ip_priority, ip_active in scan_ip:
         if ip_active == 'ON':  # Если устройство включено
-            ip_pin = ping(ip_cam)
-            flag_ip = True  # Пинг прошёл
-            if ip_pin is None or type(ip_pin) is not float:
-                flag_ip = False  # Пинг не прошёл
+            # ip_pin = ping(ip_cam)
+            # flag_ip = True  # Пинг прошёл
+            # if ip_pin is None or type(ip_pin) is not float:
+            #     flag_ip = False  # Пинг не прошёл
             # Изменяем список устройств не отвечающих на пинг
             time_end = modification_off_ip(flag_ip, row, ip_cam, ip_object, ip_type, ip_comment)
             if ip_priority == dict_const['important']:  # Заполняем таблицу приоритетных устройств
                 if flag_ip:
-                    table_priority.add_row(f'[green]{ip_cam}[/green]', str(flag_ip), ip_object, ip_type, ip_comment)
+                    table_priority.add_row(f'[green]{ip_cam}[/green]', str(True if flag_ip else False), ip_object, ip_type, ip_comment)
                 else:
-                    table_priority.add_row(f'[red]{ip_cam}[/red]', str(flag_ip), ip_object, ip_type, ip_comment)
+                    table_priority.add_row(f'[red]{ip_cam}[/red]', str(True if flag_ip else False), ip_object, ip_type, ip_comment)
             if not flag_ip:  # Заполняем таблицу не ответивших устройств
                 time_format = str(datetime.timedelta(seconds=int(time.time())-time_end))
-                table_ip.add_row(f'[red]{ip_cam}[/red]', str(ip_pin), ip_object, ip_type, ip_comment, time_format)
+                table_ip.add_row(f'[red]{ip_cam}[/red]', str(True if flag_ip else False), ip_object, ip_type, ip_comment, time_format)
         if ip_active == 'OFF':  # Если устройства отключены заполняем таблицу отключенных
             table_error.add_row(f'[red]{ip_cam}[/red]', ip_object, ip_type, ip_comment)
     #  Заполняем строки таблицами
@@ -236,6 +257,8 @@ def hidden_ping():
 while True:
     if len(scan_ip) == 0:
         scan_ip = excel_to_list()
+    # Создаем флаговый список для контроля выполнения потоков
+    thread_flag = [0 for _ in range(len(scan_ip))]
     tab_ping(scan_ip)
     reboot_ping = False
     if len(off_ip) > 0:
