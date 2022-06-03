@@ -162,13 +162,12 @@ def tab_ping(scan_ip):
 
     for ind, list_ip in track(enumerate(scan_ip), description='[green]Ping'):
         if list_ip[7] == 'ON':
+            time.sleep(0.001)
             threading.Thread(target=thread_ping, args=(ind, list_ip)).start()
         else:
             thread_flag[ind] = 1
 
     while True:
-        #time.sleep(1)
-        # print(thread_flag)
         if all(thread_flag):
             break
 
