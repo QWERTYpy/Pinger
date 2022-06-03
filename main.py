@@ -2,7 +2,6 @@
 Скрипт для опроса сетевых устройств
 """
 import sys
-import threading
 import openpyxl  # Библиотека для работы с таблицами
 from ping3 import ping
 import win10toast  # Библиотека для всплывающих сообщений
@@ -16,6 +15,7 @@ import datetime
 from collections import deque
 from init_const import dict_const
 import threading
+import concurrent.futures
 
 
 ip_book = openpyxl.load_workbook(dict_const['name_file'])  # Открывает файл
@@ -113,6 +113,7 @@ def print_time_input(timeout):
     start = time.monotonic()
     now = time.monotonic()
     count_sec = 0
+    global reboot_ping
     while now - start < timeout:
         if now - start > count_sec:
             count_sec += 1
@@ -121,6 +122,7 @@ def print_time_input(timeout):
         if msvcrt.kbhit():
             c = msvcrt.getwch()
             if c == 'q' or c == 'й':
+                reboot_ping = True
                 sys.exit()
             if c == 'u' or c == 'г':
                 break
@@ -131,14 +133,16 @@ def print_time_input(timeout):
             break
         now = time.monotonic()
 
-def thread_ping(ind,list_ip):
-    ip_pin = ping(list_ip[2])
-    list_ip[0] = 1  # Пинг прошёл
-    if ip_pin is None or type(ip_pin) is not float:
+
+def thread_ping(list_ip):
+    if list_ip[7] == 'ON':
         ip_pin = ping(list_ip[2])
+        list_ip[0] = 1  # Пинг прошёл
         if ip_pin is None or type(ip_pin) is not float:
-            list_ip[0] = 0  # Пинг не прошёл
-    thread_flag[ind] = 1
+            ip_pin = ping(list_ip[2])
+            if ip_pin is None or type(ip_pin) is not float:
+                list_ip[0] = 0  # Пинг не прошёл
+                print(list_ip[2])
 
 
 def tab_ping(scan_ip):
@@ -160,23 +164,12 @@ def tab_ping(scan_ip):
     table_log.add_column('IP Адрес - Время')
     grid_main.add_row(grid_left, table_log)
 
-    for ind, list_ip in track(enumerate(scan_ip), description='[green]Ping'):
-        if list_ip[7] == 'ON':
-            time.sleep(0.001)
-            threading.Thread(target=thread_ping, args=(ind, list_ip)).start()
-        else:
-            thread_flag[ind] = 1
-
-    while True:
-        if all(thread_flag):
-            break
+    # Создаем пул на 200 потоков
+    with concurrent.futures.ThreadPoolExecutor(max_workers=200) as executor:
+        executor.map(thread_ping, scan_ip)
 
     for flag_ip, row, ip_cam, ip_object, ip_type, ip_comment, ip_priority, ip_active in scan_ip:
         if ip_active == 'ON':  # Если устройство включено
-            # ip_pin = ping(ip_cam)
-            # flag_ip = True  # Пинг прошёл
-            # if ip_pin is None or type(ip_pin) is not float:
-            #     flag_ip = False  # Пинг не прошёл
             # Изменяем список устройств не отвечающих на пинг
             time_end = modification_off_ip(flag_ip, row, ip_cam, ip_object, ip_type, ip_comment)
             if ip_priority == dict_const['important']:  # Заполняем таблицу приоритетных устройств
@@ -251,13 +244,13 @@ def hidden_ping():
         if flag_ip:
             reboot_ping = True
             break
+        if reboot_ping:
+            break
 
 
 while True:
     if len(scan_ip) == 0:
         scan_ip = excel_to_list()
-    # Создаем флаговый список для контроля выполнения потоков
-    thread_flag = [0 for _ in range(len(scan_ip))]
     tab_ping(scan_ip)
     reboot_ping = False
     if len(off_ip) > 0:
