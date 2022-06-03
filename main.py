@@ -142,7 +142,6 @@ def thread_ping(list_ip):
             ip_pin = ping(list_ip[2])
             if ip_pin is None or type(ip_pin) is not float:
                 list_ip[0] = 0  # Пинг не прошёл
-                print(list_ip[2])
 
 
 def tab_ping(scan_ip):
