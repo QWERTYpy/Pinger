@@ -163,8 +163,8 @@ def tab_ping(scan_ip):
     table_log.add_column('IP Адрес - Время')
     grid_main.add_row(grid_left, table_log)
 
-    # Создаем пул на 200 потоков
-    with concurrent.futures.ThreadPoolExecutor(max_workers=200) as executor:
+    # Создаем пул на 30 потоков
+    with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
         executor.map(thread_ping, scan_ip)
 
     for flag_ip, row, ip_cam, ip_object, ip_type, ip_comment, ip_priority, ip_active in scan_ip:
