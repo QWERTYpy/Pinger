@@ -6,6 +6,7 @@ config.read("ping_config.ini", encoding="utf-8")
 dict_const = {}
 # Количество сек для ping
 dict_const['time_sec'] = int(config["ping_time"]["time_sec"])
+dict_const['ping_device'] = int(config["ping_time"]["ping_device"])
 # Имя файла
 dict_const['name_file'] = str(config["file_name"]["name"])
 # Столбец из которого берется IP
