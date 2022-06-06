@@ -33,6 +33,8 @@ dict_const['console'] = [int(config["console"]["cols"]), int(config["console"]["
 # Количество строк в истории
 dict_const['buffer'] = int(str(config["history"]["buffer"]))
 dict_const['log_file'] = str(config["history"]["log_file"])
+dict_const['table_history_name'] = str(config["history"]["table_history_name"])
+dict_const['table_history_field'] = [str(config["history"]["table_history_field"])]
 # Таблица приоритетных устройств
 dict_const['table_priority_name'] = str(config["table"]["table_priority_name"])
 dict_const['table_priority_field'] = [_.strip() for _ in str(config["table"]["table_priority_field"]).split(',')]
