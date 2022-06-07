@@ -70,12 +70,12 @@ class ListsIP:
     @staticmethod
     def thread_ping(list_ip):
         if list_ip[7] == 'ON':
-            ip_pin = ping(list_ip[2])
+            ip_pin = ping(list_ip[2], timeout=dict_const['time_out'])
             list_ip[0] = 1  # Пинг прошёл
             if ip_pin is None or type(ip_pin) is not float:
-                ip_pin = ping(list_ip[2])
-                if ip_pin is None or type(ip_pin) is not float:
-                    list_ip[0] = 0  # Пинг не прошёл
+                # ip_pin = ping(list_ip[2])
+                # if ip_pin is None or type(ip_pin) is not float:
+                list_ip[0] = 0  # Пинг не прошёл
 
     def hidden_ping(self, off_ip):
         """
