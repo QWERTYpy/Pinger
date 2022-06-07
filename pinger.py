@@ -12,6 +12,7 @@ import threading
 import concurrent.futures
 from list import ListsIP
 from table import TableGeneration
+from rich.progress import Progress
 
 
 def print_time_input(timeout):
@@ -48,12 +49,22 @@ def print_time_input(timeout):
 lists = ListsIP()
 console = Console()
 
+def progress_bar():
+    with Progress() as progress:
+        task_ping = progress.add_task("[red]Опрос устройств...", total=lists.progressbar)
+        while not progress.finished:
+            progress.update(task_ping, completed=lists.progressbar_complit)
 while True:
     tables = TableGeneration()
     # Создаем пул на определенной в файле настроек количесвто потоков
+    lists.progressbar_complit = 0
+
+    threading.Thread(target=progress_bar).start()
     with concurrent.futures.ThreadPoolExecutor(max_workers=dict_const['ping_device']) as executor:
         executor.map(lists.thread_ping, lists.scan_ip)
 
+        # while not progress.finished:
+        #     progress.update(task_ping, completed=lists.progressbar_complit)
     tables.table_filling(lists.scan_ip, lists.modification_off_ip)
     on_text, off_text = lists.message()
     toaster = win10toast.ToastNotifier()

@@ -2,6 +2,7 @@ import openpyxl  # Библиотека для работы с таблицам�
 from init_const import dict_const
 import time
 from ping3 import ping
+from rich.progress import track
 
 
 class ListsIP:
@@ -15,7 +16,10 @@ class ListsIP:
         self.scan_ip = []  # Список всех устройств
         self.off_ip = []  # Список отсутствующих
         self.reboot_ping = False
+        self.progressbar = 0
+        self.progressbar_complit = 0
         self.excel_to_list()
+
 
     def excel_to_list(self):
         """
@@ -25,7 +29,7 @@ class ListsIP:
         Список списков устройств
         """
         scan_ip = []
-        for row in range(1, self.max_row + 1):  # Запускаем цикл по всем строкам
+        for row in track(range(1, self.max_row + 1), description="Считывание таблицы..."):  # Запускаем цикл по всем строкам
             ip_type = self.worksheet.cell(row=row, column=dict_const['ip_type']).value  # Тип устройства
             if ip_type in dict_const['type_name']:  # Если устройство есть в списке
                 ip_cam = self.worksheet.cell(row=row, column=dict_const['ip_camera']).value  # Адрес устройства
@@ -38,6 +42,8 @@ class ListsIP:
                                            column=dict_const['ip_active']).value  # Работоспособность устройства
                 if ip_priority != dict_const['not_important']:  # Если устройство не исключено из наблюдения
                     self.scan_ip.append([0, row, ip_cam, ip_object, ip_type, ip_comment, ip_priority, ip_active])
+                    if ip_active == 'ON':
+                        self.progressbar += 1
 
     def modification_off_ip(self, flag_ip, row, ip_cam, ip_object, ip_type, ip_comment):
         """
@@ -67,8 +73,8 @@ class ListsIP:
             self.off_ip.append([0, row, ip_cam, ip_object, ip_type, ip_comment, time_end])
         return time_end
 
-    @staticmethod
-    def thread_ping(list_ip):
+    # @staticmethod
+    def thread_ping(self, list_ip):
         if list_ip[7] == 'ON':
             ip_pin = ping(list_ip[2], timeout=dict_const['time_out'])
             list_ip[0] = 1  # Пинг прошёл
@@ -76,6 +82,9 @@ class ListsIP:
                 # ip_pin = ping(list_ip[2])
                 # if ip_pin is None or type(ip_pin) is not float:
                 list_ip[0] = 0  # Пинг не прошёл
+        self.progressbar_complit += 1
+
+
 
     def hidden_ping(self, off_ip):
         """
