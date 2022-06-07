@@ -13,6 +13,7 @@ import concurrent.futures
 from list import ListsIP
 from table import TableGeneration
 from rich.progress import Progress
+from datetime import datetime
 
 
 def print_time_input(timeout):
@@ -30,7 +31,8 @@ def print_time_input(timeout):
         if now - start > count_sec:
             count_sec += 1
             print_time = timeout-count_sec
-            print("\rОсталось %03d c. | u-обновить | t-таймер | q-выход :" % print_time, end='')
+            delta = str(datetime.now()-start_programs)[:-7]
+            print("\r%s Осталось %03d c. | u-обновить | t-таймер | q-выход :" % (delta, print_time), end='')
         if msvcrt.kbhit():
             c = msvcrt.getwch()
             if c == 'q' or c == 'й':
@@ -54,6 +56,10 @@ def progress_bar():
         task_ping = progress.add_task("[red]Опрос устройств...", total=lists.progressbar)
         while not progress.finished:
             progress.update(task_ping, completed=lists.progressbar_complit)
+
+
+
+start_programs = datetime.now()
 while True:
     tables = TableGeneration()
     # Создаем пул на определенной в файле настроек количесвто потоков
