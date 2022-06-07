@@ -112,10 +112,10 @@ class ListsIP:
         for flag, _, ip, obj, _type, com, tm in self.off_ip:
             if not flag:  # Если устройство впервые не ответило, выводим сообщение и пишем в лог
                 off_text += f'{ip[10:]},'
-                file_log.write(f'OFF >> {ip} - {time.ctime()}\n')
+                file_log.write(f'OFF >> {ip:13s} - {time.ctime()}\n')
             if flag == 2:  # Если устройство ответило, выводим сообщение, пишем в лог, удаляем из списка
                 on_text += f'{ip[10:]},'
-                file_log.write(f'ONN >> {ip} - {time.ctime()}\n')
+                file_log.write(f'ON  >> {ip:13s} - {time.ctime()}\n')
                 del_index.append(self.off_ip.index([flag, _, ip, obj, _type, com, tm]))
         file_log.close()
         # Удаляем появившиеся на связи устройства
